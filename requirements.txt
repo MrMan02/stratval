@@ -1,0 +1,6 @@
+# Runtime
+numpy>=1.26
+scipy>=1.11
+
+# Development
+pytest>=8.0
