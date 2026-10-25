@@ -55,12 +55,12 @@ The Sharpe ratio computed on a backtest is an **estimate**, so it has a sampling
 |---|---|
 | $R_t$, $t = 1, \dots, T$ | per-period returns of the strategy |
 | $R_f$ | per-period risk-free rate |
-| $\mu = E[R_t]$, $\sigma^2 = \operatorname{Var}(R_t)$ | mean and variance of returns |
+| $\mu = E[R_t]$, $\sigma^2 = \textnormal{Var}(R_t)$ | mean and variance of returns |
 | $SR = (\mu - R_f)/\sigma$ | true per-period Sharpe ratio |
 | $\hat\mu$, $\hat\sigma^2$ | sample mean and sample variance (divisor $T$) |
 | $\widehat{SR} = (\hat\mu - R_f)/\hat\sigma$ | estimated Sharpe ratio |
 | $\gamma_3 = E[(R_t - \mu)^3]/\sigma^3$, $\gamma_4 = E[(R_t - \mu)^4]/\sigma^4$ | skewness and kurtosis |
-| $\rho_k = \operatorname{Corr}(R_t, R_{t-k})$ | autocorrelation of returns at lag $k$ |
+| $\rho_k = \textnormal{Corr}(R_t, R_{t-k})$ | autocorrelation of returns at lag $k$ |
 | $q$ | number of periods per year (12 for monthly, 252 for daily, ...) |
 
 All results below are asymptotic: as $T \to \infty$,
