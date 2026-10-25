@@ -91,7 +91,7 @@ Negative skewness and fat tails increase the standard error. It reduces to 1.1 w
 
 ### 1.3 Standard error under stationary, serially dependent returns (HAC estimator)
 
-**Assumption.** Returns are stationary and ergodic, with finite fourth moment (Lo, 2002, Appendix A, H1–H6). This allows serial correlation, volatility clustering and non-normality.
+**Assumption.** Returns are stationary and ergodic, with finite fourth moment and dependence dies out fast enough (Lo, 2002, Appendix A, H1–H6). This allows serial correlation, volatility clustering and non-normality.
 
 **Result.** Define $\varphi_t = \big(R_t - \mu,\ (R_t - \mu)^2 - \sigma^2\big)'$. Then
 
