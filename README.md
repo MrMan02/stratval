@@ -121,7 +121,7 @@ $$SR(q) = \eta(q) SR, \qquad \eta(q) = \frac{q}{\sqrt{q + 2 \sum_{k=1}^{q-1} (q 
 
 Positive autocorrelation makes $\sqrt q$ **overstate** the annual Sharpe ratio; Lo reports overstatements above 65% for some hedge funds. Negative autocorrelation makes it understate. The formula is exact for log returns and approximate for simple returns.
 
-Estimating all $q - 1$ autocorrelations is noisy, so the library offers three estimators, reported side by side:
+Estimating all $q - 1$ autocorrelations is noisy, so the library offers two estimators, reported side by side:
 
 - **`sqrt`**: $\sqrt q \widehat{SR}$.
 - **`lo`**: $\eta(q)$ with sample autocorrelations up to lag $K$ and $\rho_k = 0$ beyond. Its standard error follows Lo's GMM derivation (Appendix A, "Time Aggregation").
