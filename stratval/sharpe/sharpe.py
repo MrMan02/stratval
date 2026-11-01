@@ -17,17 +17,17 @@ Annualization = Literal["sqrt", "lo"]
 
 def _moments(rs : ReturnSeries) -> tuple[float, float]:
     """
-    Sample mean and variance of excess returns, divisor T (Lo, eq. 3).
+    Sample mean and variance of returns, divisor T (Lo, eq. 3).
     """
     
     return float(rs.values.mean()), float(rs.values.var(ddof=0))
 
 def sharpe_ratio(rs : ReturnSeries) -> float:
     """
-    Sharpe ratio of excess returns (Lo, eq. 4).
+    Per-period Sharpe ratio (mu - R_f) / sigma (Lo, eq. 4).
     """
     if np.ptp(rs.values) == 0.0:
-        raise ValueError("excess returns are constant: the Sharpe ratio is undefined")
+        raise ValueError("returns are constant: the Sharpe ratio is undefined")
     
     mu, sigma2 = _moments(rs)
     
@@ -54,7 +54,7 @@ def sharpe_variance(rs : ReturnSeries, method : VarianceMethod = "hac", lags : i
     """
     Asymptotic variance V of sqrt(T) (SR_hat - SR), so that Var(SR_hat) ~ V / T.
 
-    - "iid_normal": grad' Gamma_0 grad = 1 + SR^2 / 2 (Lo, A4)
+    - "iid_normal": 1 + SR^2 / 2 (Lo, A4)
     - "iid":        grad' Gamma_0 grad = 1 - g3 SR + (g4 - 1)/4 SR^2 (Mertens, 2002)
     - "hac":        grad' Sigma grad, Sigma by Newey-West with `lags` lags (Lo, A11)
     """
@@ -75,7 +75,7 @@ def sharpe_variance(rs : ReturnSeries, method : VarianceMethod = "hac", lags : i
 @dataclass(frozen=True)
 class SharpeTestResult:
     """
-    Result of hypothesis test on the Sharpe ratio.(Lo, eq. 5).
+    Result of a test of H0: SR = sr0 on the per-period Sharpe ratio (Lo, eq. 9-10).
     """
     
     sr: float
@@ -139,8 +139,8 @@ def sharpe_test(
         sr0 = sr0,
         se = se,
         stat = z,
-        p_value = p_value,
-        ci = ci,
+        p_value = float(p_value),
+        ci = (float(ci[0]), float(ci[1])),
         alpha = alpha,
         alternative = alternative,
         method = method,
@@ -148,7 +148,7 @@ def sharpe_test(
         n_obs = rs.n_obs,
     )
     
-def eta(rho : npndarray, q : int) -> float:
+def eta(rho : np.ndarray, q : int) -> float:
     """
     Lo's time-aggregation factor, SR(q) = eta(q) SR (Lo, eq. 20).
 
@@ -190,7 +190,8 @@ def _aggregation_moment_vector(rs : ReturnSeries, max_lag : int) -> np.ndarray:
     """
     (T - K) x (K + 2) matrix of moment vectors for (mu, sigma2, gamma_1..gamma_K) (Lo, A16).
 
-    Rows start at t = K + 1, where all lags exist; columns are demeaned.
+    Rows start at t = K + 1, where all lags exist. Columns are not demeaned: their
+    sample means are O(K/T), which is asymptotically negligible for Newey-West.
     """
     mu, sigma2 = _moments(rs)
     e = rs.values - mu
@@ -206,7 +207,11 @@ def _aggregation_moment_vector(rs : ReturnSeries, max_lag : int) -> np.ndarray:
 
 def _annualized_gradient(mu : float, sigma2 : float, gammas : np.ndarray, q : int, risk_free : float) -> np.ndarray:
     """
-    Gradient of g = q (mu - R_f) / sqrt(D), D = sigma2 (q + 2 sum (q - k) gamma_k) (Lo, A23-A25).
+    Gradient of g(mu, sigma2, gamma_1..gamma_K) = q (mu - R_f) / sqrt(D),
+    D = q sigma2 + 2 sum_k (q - k) gamma_k (Lo, A23-A25).
+
+    This is eta(q) SR written in autocovariances gamma_k = sigma2 rho_k, the
+    parameters estimated by the moment conditions (Lo, A16).
     """
     k = np.arange(1, gammas.size + 1)
     d = q * sigma2 + 2.0 * np.sum((q - k) * gammas)
@@ -227,6 +232,12 @@ def annualized_sharpe_variance(
     lags : int | None = None
 ) -> float:
     """
+    Asymptotic variance V(q) of sqrt(T) (SR_hat(q) - SR(q)), so Var(SR_hat(q)) ~ V(q) / T.
+
+    - "sqrt": q * V, with V from sharpe_variance(rs, variance_method, lags) (Lo, eq. 18)
+    - "lo":   grad' Sigma grad over theta = (mu, sigma2, gamma_1..gamma_K), Sigma by
+              Newey-West with `lags` lags (Lo, A22). max_lag is K, default the
+              Newey-West lag capped at q - 1.
     """
     q = rs.periods_per_year
     if method == "sqrt":
