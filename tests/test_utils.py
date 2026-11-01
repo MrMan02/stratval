@@ -42,6 +42,7 @@ def test_is_immutable():
         dict(values=[0.01, np.nan], periods_per_year=12),                # NaN
         dict(values=[0.01, np.inf], periods_per_year=12),                # inf
         dict(values=[0.01, 0.02], periods_per_year=0),                   # bad frequency
+        dict(values=[0.01, 0.02], periods_per_year=12.0),                # non-integer frequency
         dict(values=[0.01, 0.02], periods_per_year=12, return_type="pct"),
         dict(values=[0.01, 0.02], periods_per_year=12, risk_free=np.nan),
     ],

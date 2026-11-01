@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from numbers import Integral
 from typing import Literal
 
 import numpy as np
@@ -35,8 +36,8 @@ class ReturnSeries:
             raise ValueError("at least two observations are needed")
         if not np.all(np.isfinite(values)):
             raise ValueError("values contain NaN or inf")
-        if self.periods_per_year <= 0:
-            raise ValueError("periods_per_year must be positive")
+        if not isinstance(self.periods_per_year, Integral) or self.periods_per_year <= 0:
+            raise ValueError("periods_per_year must be a positive integer")
         if self.return_type not in ("simple", "log"):
             raise ValueError("return_type must be 'simple' or 'log'")
         if not np.isfinite(self.risk_free):
@@ -65,8 +66,8 @@ def long_run_covariance(phi: np.ndarray, lags : int | None = None) -> np.ndarray
     """
     Newey-West (1987) estimate of the long-run covariance of the rows of phi.
 
-    phi is a T x k (k = 1 or k = 2) matrix whose row t is phi_t. The rows must already have
-    sample mean zero (true for GMM moment vectors at the estimate), so no
+    phi is a T x k matrix whose row t is phi_t. The rows should have sample mean
+    (close to) zero, as GMM moment vectors at the estimate do, because no
     demeaning is done here. Returns the k x k matrix
     Gamma_0 + sum_{j=1}^{m} (1 - j/(m+1)) (Gamma_j + Gamma_j').
     """
