@@ -174,6 +174,7 @@ with $z_{1-\alpha} = \Phi^{-1}(1 - \alpha)$. It is $+\infty$ when $\widehat{SR} 
 ### Usage
 
 ```python
+from stratval.utils import ReturnSeries, ljung_box
 from stratval.sharpe.sharpe import (
     sharpe_test, annualized_sharpe, annualized_sharpe_variance,
     probabilistic_sharpe_ratio, min_track_record_length,
@@ -194,7 +195,7 @@ See `notebooks/01_sharpe_ratio_inference.ipynb` for worked examples on synthetic
 
 ### References
 
-- Bailey, D. H., and López de Prado, M. (2012). The Sharpe ratio efficient frontier. Journal of Risk, 15(2), 3–44.
+- Bailey, D. H., and López de Prado, M. (2012). The Sharpe ratio efficient frontier. *Journal of Risk*, 15(2), 3–44.
 - Hansen, L. P. (1982). Large sample properties of generalized method of moments estimators. *Econometrica*, 50(4), 1029–1054.
 - Ljung, G. M., and Box, G. E. P. (1978). On a measure of lack of fit in time series models. *Biometrika*, 65(2), 297–303.
 - Lo, A. W. (2002). The statistics of Sharpe ratios. *Financial Analysts Journal*, 58(4), 36–52.
