@@ -256,3 +256,48 @@ def annualized_sharpe_variance(
     grad = _annualized_gradient(mu, sigma2, gammas, q, rs.risk_free)
     
     return float(grad @ sigma_hat @ grad)
+
+##############################################################################################################
+
+def probabilistic_sharpe_ratio(
+    rs : ReturnSeries,
+    sr_star : float = 0.0,
+    method: VarianceMethod = "iid",
+    lags: int | None = None
+) -> float:
+    """
+    Probabilistic Sharpe Ratio PSR(SR*) = Phi((SR_hat - SR*) / SE) (Bailey and Lopez de Prado, 2012).
+
+    sr_star is per period, in the same units as sharpe_ratio(rs). SE uses T, not
+    the paper's T - 1, so PSR = 1 - p_value of sharpe_test with alternative "greater".
+    Default method "iid" is the paper's non-normal IID variance (Mertens, 2002).
+    """
+    result = sharpe_test(rs, sr0 = sr_star, method = method, alternative = "greater", lags = lags)
+    
+    return float(1.0 - result.p_value)
+
+def min_track_record_length(
+    rs : ReturnSeries,
+    sr_star : float = 0.0,
+    alpha : float = 0.05,
+    method: VarianceMethod = "iid",
+    lags: int | None = None
+) -> float:
+    """
+    Minimum Track Record Length (Bailey and Lopez de Prado, 2012).
+
+    Number of observations T* such that PSR(SR*) = 1 - alpha, keeping SR_hat and
+    the variance V fixed: T* = V (z_{1-alpha} / (SR_hat - SR*))^2. Uses T, not
+    T - 1, so the paper's "1 +" is dropped. Returns inf if SR_hat <= SR*.
+    Divide by rs.periods_per_year to express it in years.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    
+    sr = float(sharpe_ratio(rs))
+    if sr <= sr_star:
+        return float("inf")
+    v = sharpe_variance(rs, method = method, lags = lags)
+    z = stats.norm.ppf(1.0 - alpha)
+    
+    return float(v * (z / (sr - sr_star))**2)
