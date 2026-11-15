@@ -50,7 +50,7 @@ notebooks/
 
 ## 1. Sharpe ratio inference
 
-The Sharpe ratio computed on a backtest is an **estimate**, so it has a sampling distribution. This family gives its standard error under increasingly general assumptions on returns, tests $H_0: SR = SR_0$, and annualizes it correctly when returns are serially correlated. The main reference is Lo (2002).
+The Sharpe ratio computed on a backtest is an **estimate**, so it has a sampling distribution. This family gives its standard error under increasingly general assumptions on returns, tests $H_0: SR = SR_0$, reports the evidence as a Probabilistic Sharpe Ratio with the track record length needed for significance, and annualizes the Sharpe ratio correctly when returns are serially correlated. The main references are Lo (2002) and Bailey and López de Prado (2012).
 
 ### Notation
 
@@ -141,11 +141,43 @@ $$Q = T(T+2)\sum_{k=1}^{h} \frac{\hat\rho_k^2}{T - k} \ \overset{a}{\sim}\ \chi^
 
 are reported as **diagnostics** (`stratval.utils.ljung_box`), not used to choose between `sqrt` and `lo`: choosing by pre-test would make the reported p-values invalid. For annualization the relevant lags are $h = q - 1$.
 
+### 1.6 Probabilistic Sharpe Ratio
+
+**Idea.** Report the evidence that the Sharpe ratio exceeds a threshold $SR^*$ on a single $[0, 1]$ scale that already accounts for the track record length, skewness and kurtosis (Bailey and López de Prado, 2012).
+
+**Result.** With $\hat V$ any of the variances in 1.1–1.3,
+
+$$\widehat{PSR}(SR^*) = \Phi\!\left(\frac{\widehat{SR} - SR^*}{\sqrt{\hat V / T}}\right),$$
+
+where $\Phi$ is the standard normal CDF and $SR^*$ is per period, in the same units as $\widehat{SR}$. The paper uses $V_{\text{IID}}$ (1.2), which is the library's default here.
+
+**Interpretation.** $\widehat{PSR}(SR^*) = 1 - p$, with $p$ the p-value of the one-sided test of 1.4 of $H_0: SR = SR^*$ against $SR > SR^*$. So $H_0$ is rejected at level $\alpha$ exactly when $\widehat{PSR}(SR^*) > 1 - \alpha$. The paper calls PSR the probability that the true Sharpe ratio exceeds $SR^*$. Strictly, $SR$ is a fixed number, and PSR is the confidence with which $SR \le SR^*$ can be rejected, not a posterior probability.
+
+**Notes.**
+
+- The paper divides by $T - 1$, the library by $T$, so that the identity with 1.4 is exact. The difference is $O(1/T)$.
+- The paper assumes IID returns. Passing the HAC variance (1.3) extends PSR to serially dependent returns; this is the library's extension, not part of the paper.
+- PSR assumes the strategy is the only one tried. If it is the best of many trials, $SR^* = 0$ is too lenient a threshold (see the Deflated Sharpe Ratio).
+
+### 1.7 Minimum Track Record Length
+
+**Idea.** How many observations would be needed for $\widehat{PSR}(SR^*)$ to reach $1 - \alpha$, if $\widehat{SR}$ and $\hat V$ stayed at their current values?
+
+**Result.** Setting $\widehat{PSR}(SR^*) = 1 - \alpha$ and solving for $T$,
+
+$$\textnormal{MinTRL} = \hat V \left(\frac{z_{1-\alpha}}{\widehat{SR} - SR^*}\right)^2, \qquad \widehat{SR} > SR^*,$$
+
+with $z_{1-\alpha} = \Phi^{-1}(1 - \alpha)$. It is $+\infty$ when $\widehat{SR} \le SR^*$, since no track record length makes the evidence point above $SR^*$. The paper's version has an extra "$1 +$" because it uses $T - 1$.
+
+**Interpretation.** MinTRL is in observations at the sampling frequency; divide by $q$ for years. If $T \ge \textnormal{MinTRL}$ the one-sided test of 1.4 already rejects at level $\alpha$. It is itself an estimate (it treats $\widehat{SR}$ and $\hat V$ as fixed), so read it as an order of magnitude. Since $\textnormal{MinTRL} \propto (\widehat{SR} - SR^*)^{-2}$, halving the margin over the threshold quadruples the track record needed.
+
 ### Usage
 
 ```python
-from stratval.utils import ReturnSeries, ljung_box
-from stratval.sharpe.sharpe import sharpe_test, annualized_sharpe, annualized_sharpe_variance
+from stratval.sharpe.sharpe import (
+    sharpe_test, annualized_sharpe, annualized_sharpe_variance,
+    probabilistic_sharpe_ratio, min_track_record_length,
+)
 
 rs = ReturnSeries(monthly_log_returns, periods_per_year=12, risk_free=0.0)
 
@@ -153,12 +185,16 @@ sharpe_test(rs)                          # H0: SR = 0 vs SR > 0, HAC standard er
 annualized_sharpe(rs, method="lo")       # annual Sharpe ratio, autocorrelation-corrected
 annualized_sharpe_variance(rs, "lo")     # its asymptotic variance V(q); SE = sqrt(V(q) / T)
 ljung_box(rs.values, max_lag=11)         # diagnostic: are the first q - 1 autocorrelations zero?
+probabilistic_sharpe_ratio(rs, sr_star=0.0)        # PSR(0), Mertens IID variance
+mintrl = min_track_record_length(rs, alpha=0.05)   # observations needed for PSR(0) >= 95%
+mintrl / rs.periods_per_year                        # ... in years
 ```
 
 See `notebooks/01_sharpe_ratio_inference.ipynb` for worked examples on synthetic data.
 
 ### References
 
+- Bailey, D. H., and López de Prado, M. (2012). The Sharpe ratio efficient frontier. Journal of Risk, 15(2), 3–44.
 - Hansen, L. P. (1982). Large sample properties of generalized method of moments estimators. *Econometrica*, 50(4), 1029–1054.
 - Ljung, G. M., and Box, G. E. P. (1978). On a measure of lack of fit in time series models. *Biometrika*, 65(2), 297–303.
 - Lo, A. W. (2002). The statistics of Sharpe ratios. *Financial Analysts Journal*, 58(4), 36–52.
