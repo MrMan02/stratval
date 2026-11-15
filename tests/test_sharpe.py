@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from scipy import stats
 
 from stratval.sharpe.sharpe import (
     _moment_vector,
@@ -14,6 +15,8 @@ from stratval.sharpe.sharpe import (
     _aggregation_moment_vector,
     _annualized_gradient,
     annualized_sharpe_variance,
+    probabilistic_sharpe_ratio,
+    min_track_record_length
 )
 from stratval.utils import ReturnSeries
 
@@ -324,3 +327,87 @@ def test_annualized_variance_invalid_arguments_raise():
         annualized_sharpe_variance(rs, "lo", max_lag=12)
     with pytest.raises(ValueError):
         annualized_sharpe_variance(rs, "ar1")
+        
+##############################################################################################################
+# Probabilistic Sharpe Ratio (Bailey and Lopez de Prado, 2012)
+
+def _skewed_returns(n=500, seed=1):
+    # negatively skewed, fat-tailed returns with positive mean
+    rng = np.random.default_rng(seed)
+    x = 0.003 + 0.01 * rng.standard_normal(n)
+    crash = rng.random(n) < 0.05
+    x[crash] -= 0.04
+
+    return ReturnSeries(x, periods_per_year=252)
+
+
+def test_psr_is_one_half_at_the_estimate():
+    rs = _skewed_returns()
+    assert probabilistic_sharpe_ratio(rs, sr_star=sharpe_ratio(rs)) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("method", ["iid_normal", "iid", "hac"])
+def test_psr_is_one_minus_p_value(method):
+    rs = _skewed_returns()
+    p_value = sharpe_test(rs, sr0=0.02, method=method, alternative="greater").p_value
+    assert probabilistic_sharpe_ratio(rs, sr_star=0.02, method=method) == pytest.approx(1.0 - p_value)
+
+
+def test_psr_by_hand():
+    # Mertens variance written out from the sample moments, independently of sharpe_variance
+    rs = _skewed_returns()
+    sr = sharpe_ratio(rs)
+    e = rs.values - rs.values.mean()
+    sigma = e.std()
+    g3 = np.mean(e**3) / sigma**3
+    g4 = np.mean(e**4) / sigma**4
+    v = 1.0 - g3 * sr + (g4 - 1.0) / 4.0 * sr**2
+    expected = stats.norm.cdf(sr * np.sqrt(rs.n_obs) / np.sqrt(v))
+    assert probabilistic_sharpe_ratio(rs) == pytest.approx(expected)
+
+
+def test_psr_decreases_with_threshold():
+    rs = _skewed_returns()
+    psr = [probabilistic_sharpe_ratio(rs, sr_star=s) for s in (-0.1, 0.0, 0.05, 0.1)]
+    assert np.all(np.diff(psr) < 0)
+    
+
+@pytest.mark.parametrize("method", ["iid_normal", "iid", "hac"])
+def test_mintrl_round_trip_with_psr(method):
+    # at alpha = 1 - PSR, the current track record is exactly long enough
+    rs = _skewed_returns()
+    psr = probabilistic_sharpe_ratio(rs, sr_star=0.01, method=method)
+    mintrl = min_track_record_length(rs, sr_star=0.01, alpha=1.0 - psr, method=method)
+    assert mintrl == pytest.approx(rs.n_obs)
+
+
+def test_mintrl_by_hand():
+    # SR = 0.15, normal returns: V = 1.01125, T* = V (1.6449 / 0.15)^2 = 121.6
+    rs = _series_with_sharpe(0.15, 120)
+    mintrl = min_track_record_length(rs, method="iid_normal")
+    assert mintrl == pytest.approx(1.01125 * (stats.norm.ppf(0.95) / 0.15) ** 2)
+    assert mintrl == pytest.approx(121.6, abs=0.05)
+
+
+@pytest.mark.parametrize("sr_star", [0.2, 0.3])
+def test_mintrl_is_infinite_below_threshold(sr_star):
+    rs = _series_with_sharpe(0.15, 120)
+    assert min_track_record_length(rs, sr_star=sr_star) == float("inf")
+
+
+def test_mintrl_grows_with_confidence_and_threshold():
+    rs = _skewed_returns()
+    assert min_track_record_length(rs, alpha=0.01) > min_track_record_length(rs, alpha=0.05)
+    assert min_track_record_length(rs, sr_star=0.03) > min_track_record_length(rs, sr_star=0.0)
+
+
+def test_mintrl_penalizes_negative_skew():
+    rs = _skewed_returns()
+    assert min_track_record_length(rs, method="iid") > min_track_record_length(rs, method="iid_normal")
+
+
+@pytest.mark.parametrize("alpha", [0.0, 1.0])
+def test_mintrl_invalid_alpha_raises(alpha):
+    rs = _skewed_returns()
+    with pytest.raises(ValueError):
+        min_track_record_length(rs, alpha=alpha)
