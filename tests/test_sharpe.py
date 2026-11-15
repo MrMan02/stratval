@@ -329,7 +329,6 @@ def test_annualized_variance_invalid_arguments_raise():
         annualized_sharpe_variance(rs, "ar1")
         
 ##############################################################################################################
-# Probabilistic Sharpe Ratio (Bailey and Lopez de Prado, 2012)
 
 def _skewed_returns(n=500, seed=1):
     # negatively skewed, fat-tailed returns with positive mean
